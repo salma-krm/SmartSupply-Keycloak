@@ -1,5 +1,6 @@
-services:
+version: '3.8'
 
+services:
   # =======================
   # PostgreSQL
   # =======================
@@ -15,6 +16,13 @@ services:
       - "5480:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartsupply-network
+    healthcheck:
+      test:  ["CMD-SHELL", "pg_isready -U postgres -d SmartSupply"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # =======================
   # PgAdmin
@@ -30,5 +38,82 @@ services:
       - "9090:80"
     depends_on:
       - db
+    networks:
+      - smartsupply-network
+
+  # =======================
+  # Keycloak
+  # =======================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: SmartSupply-keycloak
+    restart: always
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD:  admin
+      KC_DB: postgres
+      KC_DB_URL:  jdbc:postgresql://db:5432/SmartSupply
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD:  123123
+      KC_HOSTNAME: localhost
+      KC_HTTP_ENABLED: "true"
+    command: start-dev
+    ports:
+      - "8090:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smartsupply-network
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # =======================
+  # API Spring Boot
+  # =======================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: SmartSupply-api
+    restart: always
+    environment:
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/SmartSupply
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+
+      # Keycloak
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/logistics-realm
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/logistics-realm/protocol/openid-connect/certs
+
+      # Server
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - smartsupply-network
+
+# =======================
+# Networks
+# =======================
+networks:
+  smartsupply-network:
+    driver: bridge
+
+# =======================
+# Volumes
+# =======================
 volumes:
   postgres_data:
