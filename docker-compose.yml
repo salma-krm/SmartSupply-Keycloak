@@ -1,0 +1,34 @@
+services:
+
+  # =======================
+  # PostgreSQL
+  # =======================
+  db:
+    image: postgres:17
+    container_name: SmartSupply-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123123
+      POSTGRES_DB: SmartSupply
+    ports:
+      - "5480:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # =======================
+  # PgAdmin
+  # =======================
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: SmartSupply-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "9090:80"
+    depends_on:
+      - db
+volumes:
+  postgres_data:
