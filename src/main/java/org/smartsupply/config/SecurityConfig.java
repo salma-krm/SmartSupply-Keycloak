@@ -1,97 +1,47 @@
 package org.smartsupply.config;
 
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config. annotation.web.builders.HttpSecurity;
+import org.springframework. security.config.annotation.web. configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security. oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    private final KeycloakRoleConverter keycloakRoleConverter;
 
-    @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails admin = User.builder()
-                .username("admin")
-                .password(passwordEncoder.encode("adminPass"))
-                .roles("ADMIN")
-                .build();
-
-        UserDetails wm = User.builder()
-                .username("wm")
-                .password(passwordEncoder.encode("wmPass"))
-                .roles("WAREHOUSE_MANAGER")
-                .build();
-
-        UserDetails client = User.builder()
-                .username("client")
-                .password(passwordEncoder.encode("clientPass"))
-                .roles("CLIENT")
-                .build();
-
-        return new InMemoryUserDetailsManager(admin, wm, client);
+    public SecurityConfig(KeycloakRoleConverter keycloakRoleConverter) {
+        this.keycloakRoleConverter = keycloakRoleConverter;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .cors(cors -> cors.disable())
                 .csrf(csrf -> csrf.disable())
-
-                .httpBasic(Customizer.withDefaults())
-
-                .logout(logout -> logout
-                        .logoutUrl("/api/Auth/Logout")
-                        .logoutSuccessHandler((request, response, authentication) -> {
-                            response.setHeader("WWW-Authenticate", "Basic realm=\"SmartSuppl\"");
-                            response.sendError(HttpStatus.UNAUTHORIZED.value(), "Logged out");
-                        })
-                        .permitAll()
-                )
-
-
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-
-
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/products/category/**").hasRole("ADMIN")
-
-                        .requestMatchers("/api/inventory/**").hasAnyRole("WAREHOUSE_MANAGER", "ADMIN")
-                        .requestMatchers("/api/shipments/**").hasAnyRole("WAREHOUSE_MANAGER", "ADMIN")
-
-                        .requestMatchers("/api/orders/**").hasAnyRole("CLIENT", "ADMIN")
-
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
+                        .anyRequest().authenticated()
                 )
-
-
-
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-                        .accessDeniedHandler((request, response, accessDeniedException) ->
-                                response.sendError(HttpStatus.FORBIDDEN.value(), "Access Denied"))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt. jwtAuthenticationConverter(jwtAuthenticationConverter()))
                 );
 
         return http.build();
     }
 
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(keycloakRoleConverter);
+        return converter;
+    }
 }
