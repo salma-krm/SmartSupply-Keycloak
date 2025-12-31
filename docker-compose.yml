@@ -60,6 +60,8 @@ services:
     command: start-dev
     ports:
       - "8090:8080"
+    volumes:
+      - ./keycloak-config:/opt/keycloak/data/import
     depends_on:
       db:
         condition: service_healthy
