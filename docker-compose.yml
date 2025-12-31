@@ -57,7 +57,7 @@ services:
       KC_DB_PASSWORD:  123123
       KC_HOSTNAME: localhost
       KC_HTTP_ENABLED: "true"
-    command: start-dev
+    command: start-dev --import-realm
     ports:
       - "8090:8080"
     volumes:
