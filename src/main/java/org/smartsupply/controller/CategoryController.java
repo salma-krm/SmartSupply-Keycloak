@@ -12,6 +12,7 @@ import org.smartsupply.model.enums.Role;
 import org.smartsupply.service.CategoryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @PostMapping
-    @RequireRole({Role.ADMIN, Role.WAREHOUSE_MANAGER})
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_MANAGER')")
     public ResponseEntity<CategoryResponseDto> createCategory(
             @Valid @RequestBody CategoryRequestDto categoryRequestDto) {
         CategoryResponseDto response = categoryService.createCategory(categoryRequestDto);

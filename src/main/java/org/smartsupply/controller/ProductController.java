@@ -11,6 +11,7 @@ import org.smartsupply.model.enums.Role;
 import org.smartsupply.service.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-    @RequireRole({Role.ADMIN, Role.WAREHOUSE_MANAGER})
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductResponseDto> createProduct(
             @Valid @RequestBody ProductRequestDto productRequestDto) {
         ProductResponseDto response = productService.createProduct(productRequestDto);
@@ -32,7 +33,7 @@ public class ProductController {
     }
 
     @GetMapping
-    @RequireAuth
+
     public ResponseEntity<List<ProductResponseDto>> getAllProducts() {
         List<ProductResponseDto> products = productService.getAllProducts();
         return ResponseEntity.ok(products);
