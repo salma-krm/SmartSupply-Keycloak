@@ -1,0 +1,116 @@
+     version: '3.8'
+
+     services:
+       # =======================
+       # PostgreSQL
+       # =======================
+       db:
+         image: postgres:17
+         container_name: SmartSupply-db
+         restart: always
+         environment:
+           POSTGRES_USER: postgres
+           POSTGRES_PASSWORD: 123123
+           POSTGRES_DB: SmartSupply
+         ports:
+           - "5480:5432"
+         volumes:
+           - postgres_data:/var/lib/postgresql/data
+         networks:
+           - smartsupply-network
+         healthcheck:
+           test: ["CMD-SHELL", "pg_isready -U postgres -d SmartSupply"]
+           interval: 10s
+           timeout: 5s
+           retries: 5
+
+       # =======================
+       # PgAdmin
+       # =======================
+       pgadmin:
+         image: dpage/pgadmin4
+         container_name: SmartSupply-pgadmin
+         restart: always
+         environment:
+           PGADMIN_DEFAULT_EMAIL: admin@admin.com
+           PGADMIN_DEFAULT_PASSWORD: admin
+         ports:
+           - "9090:80"
+         depends_on:
+           - db
+         networks:
+           - smartsupply-network
+
+       # =======================
+       # Keycloak
+       # =======================
+       keycloak:
+         image: quay.io/keycloak/keycloak:23.0
+         container_name: SmartSupply-keycloak
+         restart: always
+         environment:
+           KEYCLOAK_ADMIN: admin
+           KEYCLOAK_ADMIN_PASSWORD: 123123
+           KC_DB: postgres
+           KC_DB_URL: jdbc:postgresql://db:5432/SmartSupply
+           KC_DB_USERNAME: postgres
+           KC_DB_PASSWORD: 123123
+           KC_HTTP_ENABLED: "true"
+           KC_PROXY_HEADERS: xforwarded
+           KC_PROXY: edge
+         command: start-dev --import-realm
+         ports:
+           - "8090:8080"
+         volumes:
+           - ./keycloak-config:/opt/keycloak/data/import
+         depends_on:
+           db:
+             condition: service_healthy
+         networks:
+           - smartsupply-network
+
+       # =======================
+       # API Spring Boot
+       # =======================
+       api:
+         build:
+           context: .
+           dockerfile: Dockerfile
+         container_name: SmartSupply-api
+         restart: always
+         environment:
+           # Database
+           SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/SmartSupply
+           SPRING_DATASOURCE_USERNAME: postgres
+           SPRING_DATASOURCE_PASSWORD: 123123
+           SPRING_JPA_HIBERNATE_DDL_AUTO: update
+           SPRING_JPA_SHOW_SQL: "true"
+
+           # Keycloak
+           KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/logistics-realm
+           KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/logistics-realm/protocol/openid-connect/certs
+
+           # Server
+           SERVER_PORT: 8081
+         ports:
+           - "8081:8081"
+         depends_on:
+           db:
+             condition: service_healthy
+           keycloak:
+             condition: service_started
+         networks:
+           - smartsupply-network
+
+  # =======================
+  # Networks
+  # =======================
+     networks:
+       smartsupply-network:
+         driver: bridge
+
+  # =======================
+  # Volumes
+  # =======================
+     volumes:
+       postgres_data:
